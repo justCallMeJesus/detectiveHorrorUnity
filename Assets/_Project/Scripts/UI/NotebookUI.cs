@@ -2,15 +2,13 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Opens and closes the player's notebook panel using Unity's uGUI Canvas system.
-/// Attach to any GameObject in your scene (e.g. "NotebookManager").
-///
-/// Setup:
-///   1. Create a Canvas > Panel GameObject for the notebook and assign it to notebookPanel.
-///   2. Create an Input Action (e.g. "ToggleNotebook") and assign the reference below.
+/// Opens and closes the player's notebook panel.
+/// Registers its own lock with PlayerManager — no direct knowledge of other systems needed.
 /// </summary>
 public class NotebookUI : MonoBehaviour
 {
+    private const string LockId = "Notebook";
+
     [Header("Input")]
     [Tooltip("Input Action that toggles the notebook (e.g. bound to N).")]
     public InputActionReference toggleNotebookAction;
@@ -19,7 +17,7 @@ public class NotebookUI : MonoBehaviour
     [Tooltip("The root Panel / GameObject of the notebook UI.")]
     public GameObject notebookPanel;
 
-    // -------------------------------------------------------------------------
+    public event System.Action<bool> OnNotebookStateChanged;
 
     private bool _isOpen = false;
 
@@ -33,7 +31,6 @@ public class NotebookUI : MonoBehaviour
             return;
         }
 
-        // Start hidden.
         SetPanelVisible(false);
     }
 
@@ -57,6 +54,8 @@ public class NotebookUI : MonoBehaviour
 
     private void OnToggleNotebook(InputAction.CallbackContext ctx)
     {
+        // Notebook can open on top of Inspect, but nothing should block it at its priority.
+        // If you ever want something to block the notebook, raise its priority in LockPriority.
         SetPanelVisible(!_isOpen);
     }
 
@@ -67,6 +66,13 @@ public class NotebookUI : MonoBehaviour
 
         _isOpen = visible;
         notebookPanel.SetActive(visible);
+
+        if (visible)
+            PlayerManager.Instance.AddLock(LockId, LockPriority.Notebook);
+        else
+            PlayerManager.Instance.RemoveLock(LockId);
+
+        OnNotebookStateChanged?.Invoke(visible);
 
         Debug.Log($"[NotebookUI] Notebook {(visible ? "opened" : "closed")}.");
     }

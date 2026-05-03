@@ -106,4 +106,5 @@ public class Crosshair : MonoBehaviour
 
     /// <summary>Show or hide the crosshair.</summary>
     public void SetVisible(bool visible) => _image.enabled = visible;
+
 }

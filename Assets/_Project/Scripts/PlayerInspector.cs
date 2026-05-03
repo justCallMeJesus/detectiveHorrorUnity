@@ -2,16 +2,22 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Handles object inspection. Registers its own lock with PlayerManager.
+/// Blocked by anything with higher priority (e.g. Notebook open on top of it is fine,
+/// but Inspect cannot START if something higher-priority is already active).
+/// </summary>
 public class PlayerInspector : MonoBehaviour
 {
+    private const string LockId = "Inspect";
+
     [SerializeField] private InputActionReference inspectAction;
     [SerializeField] private Camera playerCamera;
     [SerializeField] private float inspectRange = 3f;
-    [SerializeField] private float inspectViewDistance = 1.5f;  // how far in front of the object the camera parks
     [SerializeField] private float transitionDuration = 0.35f;
 
     private IInspectable _currentTarget;
-    private Transform _currentTargetTransform;   // stored from raycast, avoids needing Transform on IInspectable
+    private Transform _currentTargetTransform;
 
     private bool _isInspecting;
     private Coroutine _transitionCoroutine;
@@ -19,10 +25,11 @@ public class PlayerInspector : MonoBehaviour
     public bool IsInspecting => _isInspecting;
     public event System.Action<bool> OnInspectStateChanged;
 
-    // saved so we can restore the camera exactly
     private Transform _camOriginalParent;
     private Vector3 _camOriginalLocalPos;
     private Quaternion _camOriginalLocalRot;
+
+    // -------------------------------------------------------------------------
 
     private void OnEnable()
     {
@@ -38,7 +45,7 @@ public class PlayerInspector : MonoBehaviour
 
     private void Update()
     {
-        if (_isInspecting) return;  // lock targeting while focused
+        if (_isInspecting) return;
 
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
         Debug.DrawRay(ray.origin, ray.direction * inspectRange, Color.red);
@@ -55,19 +62,31 @@ public class PlayerInspector : MonoBehaviour
         }
     }
 
+    // -------------------------------------------------------------------------
+
     private void OnInspectPerformed(InputAction.CallbackContext ctx)
     {
         if (_isInspecting)
+        {
             ExitInspect();
+        }
         else if (_currentTarget != null)
+        {
+            // Don't start inspecting if something higher-priority is active (e.g. dialogue).
+            // Notebook is HIGHER priority so it also blocks starting a new inspect,
+            // which is the behaviour you had before with the NotebookOpen check.
+            if (PlayerManager.Instance.IsBlockedBy(LockPriority.Inspect)) return;
+
             EnterInspect();
+        }
     }
 
-    // ─────────────────────────────────────────────
+    // -------------------------------------------------------------------------
 
     private void EnterInspect()
     {
         _isInspecting = true;
+        PlayerManager.Instance.AddLock(LockId, LockPriority.Inspect);
         OnInspectStateChanged?.Invoke(true);
         _currentTarget.Inspect();
 
@@ -78,7 +97,6 @@ public class PlayerInspector : MonoBehaviour
         playerCamera.transform.SetParent(null, worldPositionStays: true);
 
         Transform ip = _currentTarget.InspectPoint;
-        // look FROM the inspect point TOWARD the object — rotation in the editor no longer matters
         Quaternion lookRot = Quaternion.LookRotation(_currentTargetTransform.position - ip.position);
         RestartTransition(ip.position, lookRot);
     }
@@ -86,9 +104,9 @@ public class PlayerInspector : MonoBehaviour
     private void ExitInspect()
     {
         _isInspecting = false;
+        PlayerManager.Instance.RemoveLock(LockId);
         OnInspectStateChanged?.Invoke(false);
 
-        // convert saved local pose back to world space (parent may have moved)
         Vector3 worldPos = _camOriginalParent != null
             ? _camOriginalParent.TransformPoint(_camOriginalLocalPos)
             : _camOriginalLocalPos;
@@ -98,7 +116,6 @@ public class PlayerInspector : MonoBehaviour
 
         RestartTransition(worldPos, worldRot, onComplete: () =>
         {
-            // snap & re-parent to eliminate any float drift
             playerCamera.transform.SetParent(_camOriginalParent, worldPositionStays: true);
             playerCamera.transform.localPosition = _camOriginalLocalPos;
             playerCamera.transform.localRotation = _camOriginalLocalRot;
@@ -128,7 +145,6 @@ public class PlayerInspector : MonoBehaviour
             elapsed += Time.deltaTime;
             yield return null;
         }
-        // guarantee exact end state
         playerCamera.transform.SetPositionAndRotation(toPos, toRot);
         onComplete?.Invoke();
     }
