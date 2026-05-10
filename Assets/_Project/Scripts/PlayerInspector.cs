@@ -29,6 +29,8 @@ public class PlayerInspector : MonoBehaviour
     private Vector3 _camOriginalLocalPos;
     private Quaternion _camOriginalLocalRot;
 
+    private InspectableDataSO currentlyInspectingData;
+
     // -------------------------------------------------------------------------
 
     private void OnEnable()
@@ -77,16 +79,17 @@ public class PlayerInspector : MonoBehaviour
             // which is the behaviour you had before with the NotebookOpen check.
             if (PlayerManager.Instance.IsBlockedBy(LockPriority.Inspect)) return;
 
-            EnterInspect();
+            EnterInspect(_currentTarget.InspectableDataSO);
         }
     }
 
     // -------------------------------------------------------------------------
 
-    private void EnterInspect()
+    private void EnterInspect(InspectableDataSO data)
     {
         _isInspecting = true;
         PlayerManager.Instance.AddLock(LockId, LockPriority.Inspect);
+        currentlyInspectingData = data;
         OnInspectStateChanged?.Invoke(true);
         _currentTarget.Inspect();
 
@@ -105,6 +108,7 @@ public class PlayerInspector : MonoBehaviour
     {
         _isInspecting = false;
         PlayerManager.Instance.RemoveLock(LockId);
+        currentlyInspectingData = null;
         OnInspectStateChanged?.Invoke(false);
 
         Vector3 worldPos = _camOriginalParent != null
@@ -147,5 +151,15 @@ public class PlayerInspector : MonoBehaviour
         }
         playerCamera.transform.SetPositionAndRotation(toPos, toRot);
         onComplete?.Invoke();
+    }
+
+    public InspectableDataSO TryGetCurrentlyInspectingSO()
+    {
+        if(currentlyInspectingData != null)
+        {
+            return currentlyInspectingData;
+        }
+        // else
+        return null;
     }
 }
