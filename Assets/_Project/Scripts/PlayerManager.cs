@@ -11,9 +11,16 @@ public class PlayerManager : MonoBehaviour
 
     private readonly List<(string id, int priority)> _activeLocks = new();
 
+    public PlayerInspector playerInspector {  get; private set; }
+
     private void Awake()
     {
         Instance = this;
+    }
+
+    private void Start()
+    {
+        playerInspector = GetComponent<PlayerInspector>();
     }
 
     /// <summary>

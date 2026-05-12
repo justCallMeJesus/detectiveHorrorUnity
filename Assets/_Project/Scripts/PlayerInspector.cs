@@ -23,6 +23,7 @@ public class PlayerInspector : MonoBehaviour
     private Coroutine _transitionCoroutine;
 
     public bool IsInspecting => _isInspecting;
+    public IInspectable currentlyInspecting {  get; private set; }
     public event System.Action<bool> OnInspectStateChanged;
 
     private Transform _camOriginalParent;
@@ -92,6 +93,7 @@ public class PlayerInspector : MonoBehaviour
         currentlyInspectingData = data;
         OnInspectStateChanged?.Invoke(true);
         _currentTarget.Inspect();
+        currentlyInspecting = _currentTarget;
 
         _camOriginalParent = playerCamera.transform.parent;
         _camOriginalLocalPos = playerCamera.transform.localPosition;
@@ -110,6 +112,7 @@ public class PlayerInspector : MonoBehaviour
         PlayerManager.Instance.RemoveLock(LockId);
         currentlyInspectingData = null;
         OnInspectStateChanged?.Invoke(false);
+        currentlyInspecting = null;
 
         Vector3 worldPos = _camOriginalParent != null
             ? _camOriginalParent.TransformPoint(_camOriginalLocalPos)

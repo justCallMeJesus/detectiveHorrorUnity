@@ -17,6 +17,10 @@ public class NotebookUI : MonoBehaviour
     [Tooltip("The root Panel / GameObject of the notebook UI.")]
     public GameObject notebookPanel;
 
+    public GameObject mapPage;
+    public GameObject roomPage;
+    public RoomPageController roomPageController;
+
     public event System.Action<bool> OnNotebookStateChanged;
 
     private bool _isOpen = false;
@@ -63,18 +67,36 @@ public class NotebookUI : MonoBehaviour
     public void SetPanelVisible(bool visible)
     {
         if (notebookPanel == null) return;
-
         _isOpen = visible;
         notebookPanel.SetActive(visible);
-
         if (visible)
+        {
             PlayerManager.Instance.AddLock(LockId, LockPriority.Notebook);
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            OpenMapPage();
+        }
         else
+        {
             PlayerManager.Instance.RemoveLock(LockId);
-
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
         OnNotebookStateChanged?.Invoke(visible);
-
         Debug.Log($"[NotebookUI] Notebook {(visible ? "opened" : "closed")}.");
+    }
+
+    public void OpenRoomPage(RoomUIDataSO room)
+    {
+        mapPage.SetActive(false);
+        roomPage.SetActive(true);
+        roomPageController.Populate(room);
+    }
+
+    public void OpenMapPage()
+    {
+        roomPage.SetActive(false);
+        mapPage.SetActive(true);
     }
 
     public bool IsOpen => _isOpen;

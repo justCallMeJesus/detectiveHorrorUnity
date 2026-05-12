@@ -13,6 +13,10 @@ public class InspectableObject : MonoBehaviour, IInspectable
 
     public InspectableDataSO InspectableDataSO => data;
 
+    public int RoomId;
+
+    public int evidenceId;
+
     public void Inspect()
     {
         Debug.Log(inspectMessage);
