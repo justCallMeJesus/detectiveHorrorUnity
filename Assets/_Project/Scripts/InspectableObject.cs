@@ -13,7 +13,7 @@ public class InspectableObject : MonoBehaviour, IInspectable
 
     public InspectableDataSO InspectableDataSO => data;
 
-    public int RoomId;
+    public RoomId RoomId;
 
     public int evidenceId;
 

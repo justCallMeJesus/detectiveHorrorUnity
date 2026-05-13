@@ -3,8 +3,9 @@ using UnityEngine;
 
 /// <summary>
 /// Listens to notebook open/close events and reacts to the current inspection state.
-/// When the notebook is opened while the player is inspecting something,
-/// it saves the inspected object's data and RoomId (once only).
+/// When the notebook is opened while the player is inspecting something:
+///   - saves the inspected object's data and RoomId (once only), and
+///   - immediately navigates to the room page the object belongs to.
 /// </summary>
 public class NotebookManager : MonoBehaviour
 {
@@ -12,8 +13,11 @@ public class NotebookManager : MonoBehaviour
     [Tooltip("Reference to the NotebookUI that drives open/close events.")]
     [SerializeField] private NotebookUI notebookUI;
 
-    /// <summary>Stores each saved entry as (data SO, roomId, evidenceId).</summary>
-    private readonly List<(InspectableDataSO data, int roomId, int evidenceId)> _savedEntries = new();
+    [Header("Room Data")]
+    [Tooltip("All RoomUIDataSOs in the game. Order does not matter ? looked up by RoomID enum.")]
+    [SerializeField] private RoomUIDataSO[] roomDataEntries;
+
+    private readonly List<NotebookEntry> _savedEntries = new();
 
     // -------------------------------------------------------------------------
 
@@ -60,24 +64,109 @@ public class NotebookManager : MonoBehaviour
             return;
         }
 
-        int roomId = inspectable.RoomId;
+        RoomId roomId = inspectable.RoomId;
         int evidenceId = inspectable.evidenceId;
 
-        if (IsAlreadySaved(evidenceId))
+        // --- Save (once only) ------------------------------------------------
+        if (!IsAlreadySaved(evidenceId))
         {
-            Debug.Log($"[NotebookManager] '{data.EvidenceName}' (evidenceId {evidenceId}, Room {roomId}) is already saved — skipping.");
-            return;
+            _savedEntries.Add(new NotebookEntry(data, roomId, evidenceId));
+            Debug.Log($"[NotebookManager] Saved '{data.EvidenceName}' (evidenceId {evidenceId}) from {roomId}.");
+        }
+        else
+        {
+            Debug.Log($"[NotebookManager] '{data.EvidenceName}' (evidenceId {evidenceId}, {roomId}) is already saved ? skipping save.");
         }
 
-        _savedEntries.Add((data, roomId, evidenceId));
-        Debug.Log($"[NotebookManager] Saved '{data.EvidenceName}' (evidenceId {evidenceId}) from Room {roomId}.");
+        // --- Navigate to the object's room page ------------------------------
+        RoomUIDataSO roomData = GetRoomData(roomId);
+        if (roomData != null)
+        {
+            notebookUI.OpenRoomPage(roomData);
+            notebookUI.roomPageController.OpenEvidence(evidenceId);
+            Debug.Log($"[NotebookManager] Opened room page for {roomId} and selected evidenceId {evidenceId}.");
+        }
+        else
+        {
+            Debug.LogWarning($"[NotebookManager] No RoomUIDataSO found for {roomId} ? falling back to map page.");
+        }
     }
+
+    // -------------------------------------------------------------------------
+    // Entry mutation
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Updates the player-authored fields of an existing entry.
+    /// Pass null for any parameter you do not want to change.
+    /// Returns true if an entry with the given evidenceId was found.
+    /// </summary>
+    public bool TryUpdateEntry(int evidenceId, string notes = null, UnityEngine.Sprite photo = null)
+    {
+        NotebookEntry entry = GetEntry(evidenceId);
+        if (entry == null) return false;
+
+        if (notes != null) entry.playerNotes = notes;
+        if (photo != null) entry.playerPhoto = photo;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Appends a stroke (list of points) to the drawing of an existing entry.
+    /// Returns true if an entry with the given evidenceId was found.
+    /// </summary>
+    public bool TryAddDrawingStroke(int evidenceId, List<UnityEngine.Vector2> stroke)
+    {
+        NotebookEntry entry = GetEntry(evidenceId);
+        if (entry == null) return false;
+
+        entry.playerDrawingStrokes.Add(stroke);
+        return true;
+    }
+
+    /// <summary>
+    /// Clears all drawing strokes from an existing entry.
+    /// Returns true if an entry with the given evidenceId was found.
+    /// </summary>
+    public bool TryClearDrawing(int evidenceId)
+    {
+        NotebookEntry entry = GetEntry(evidenceId);
+        if (entry == null) return false;
+
+        entry.playerDrawingStrokes.Clear();
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Queries
+    // -------------------------------------------------------------------------
+
+    /// <summary>Read-only access to all saved entries (e.g. for UI display).</summary>
+    public IReadOnlyList<NotebookEntry> SavedEntries => _savedEntries;
+
+    /// <summary>Returns the entry with the given evidenceId, or null if not found.</summary>
+    public NotebookEntry GetEntry(int evidenceId)
+        => _savedEntries.Find(e => e.evidenceId == evidenceId);
 
     private bool IsAlreadySaved(int evidenceId)
-    {
-        return _savedEntries.Exists(e => e.evidenceId == evidenceId);
-    }
+        => _savedEntries.Exists(e => e.evidenceId == evidenceId);
 
-    /// <summary>Read-only access to all saved entries for other systems (e.g. UI).</summary>
-    public IReadOnlyList<(InspectableDataSO data, int roomId, int evidenceId)> SavedEntries => _savedEntries;
+    /// <summary>
+    /// Finds the <see cref="RoomUIDataSO"/> whose RoomID matches the given enum value.
+    /// Returns null if none is found.
+    /// </summary>
+    private RoomUIDataSO GetRoomData(RoomId roomId)
+    {
+        if (roomDataEntries == null) return null;
+
+        foreach (RoomUIDataSO entry in roomDataEntries)
+        {
+            if (entry != null && entry.RoomID == roomId)
+                return entry;
+        }
+
+        Debug.LogWarning($"[NotebookManager] No RoomUIDataSO entry found for {roomId}.");
+        return null;
+    }
 }

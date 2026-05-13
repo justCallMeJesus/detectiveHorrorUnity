@@ -5,5 +5,5 @@ public class RoomUIDataSO : ScriptableObject
 {
     public string RoomName;
 
-    public int RoomID;
+    public RoomId RoomID;
 }

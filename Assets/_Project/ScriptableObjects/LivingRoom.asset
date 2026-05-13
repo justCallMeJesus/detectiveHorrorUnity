@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: LivingRoom
   m_EditorClassIdentifier: Assembly-CSharp::RoomUIDataSO
   RoomName: Living Room
-  RoomID: 1
+  RoomID: 0
